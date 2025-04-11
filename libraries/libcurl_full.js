@@ -74,7 +74,7 @@ function array_from_uint(int, size) {
 function concat_uint8array() {
   let total_length = 0;
   for (let array of arguments) {
-    total_length += array.length;
+    total_length += array.length || array.byteLength;
   }
   let new_array = new Uint8Array(total_length);
   let index = 0;

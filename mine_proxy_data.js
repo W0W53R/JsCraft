@@ -8,6 +8,26 @@ function to_short(number) {
     view.setInt16(0, number, false); // Use big-endian (network byte order)
     return buffer;
 }
+function to_byte(number) {
+    if (!Number.isInteger(number) || number < -128 || number > 127) {
+        throw new Error("Input must be an integer between -128 and 127.");
+    }
+
+    const buffer = new ArrayBuffer(1); // 1 byte for a byte
+    const view = new DataView(buffer);
+    view.setInt8(0, number); // Use big-endian (network byte order)
+    return buffer;
+}
+function to_ubyte(number) {
+    if (!Number.isInteger(number) || number < 0 || number > 255) {
+        throw new Error("Input must be an integer between 0 and 255.");
+    }
+
+    const buffer = new ArrayBuffer(1); // 1 byte for an unsigned byte
+    const view = new DataView(buffer);
+    view.setUint8(0, number); // Use big-endian (network byte order)
+    return buffer;
+}
 
 function to_ushort(number) {
     if (!Number.isInteger(number) || number < 0 || number > 65535) {
@@ -20,11 +40,21 @@ function to_ushort(number) {
     return buffer;
 }
 
-function to_long(number) {
-    if (!Number.isInteger(number) || number < -2147483648 || number > 2147483647) {
-        throw new Error("Input must be an integer between -2147483648 and 2147483647.");
-    }
+function to_int(number) {
+    const buffer = new ArrayBuffer(4); // 2 bytes for a 16-bit short
+    const view = new DataView(buffer);
+    view.setInt32(0, number, false); // Use big-endian (network byte order)
+    return buffer;
+}
 
+function to_uint(number) {
+    const buffer = new ArrayBuffer(4); // 2 bytes for a 16-bit short
+    const view = new DataView(buffer);
+    view.setUint32(0, number, false); // Use big-endian (network byte order)
+    return buffer;
+}
+
+function to_long(number) {
     const buffer = new ArrayBuffer(8); // 8 bytes for a 64-bit long
     const view = new DataView(buffer);
     view.setBigInt64(0, BigInt(number), false); // Use big-endian (network byte order)
@@ -53,8 +83,28 @@ function to_varint(number) {
 }
 
 function to_string(string) {
+    if (!(typeof string === "string")) {
+        throw new TypeError("to_string(string): string is not of type String")
+    }
     const size = string.length
-    return join_buffer(to_varint(size), new TextEncoder().encode(string).buffer)
+    return join_buffer(to_varint(size), convertTextToBinary(string).buffer)
+}
+function to_bytearray(bytes) {
+    const size = (bytes.length || bytes.byteLength) || 0
+    return join_buffer(to_varint(size), bytes)
+}
+function to_boolean(boolean) {
+    if (!(typeof boolean === "boolean")) {
+        throw new TypeError("to_boolean(boolean): boolean is not of type Boolean")
+    }
+    return new Uint8Array(boolean ? 1 : 0)
+}
+function to_position(x, y, z) {
+    const blob = ((new BigInt(x) & 0x3FFFFFFn) << 38n) | ((new BigInt(z) & 0x3FFFFFFn) << 12n) | (new BigInt(y) & 0xFFFn)
+    const buffer = new ArrayBuffer(8)
+    const view = new BigUint64Array(buffer)
+    view[0] = blob
+    return buffer
 }
 
 function join_buffer(...buffers) {
@@ -68,6 +118,7 @@ function join_buffer(...buffers) {
     // Copy each buffer into the result buffer
     let offset = 0;
     for (const buffer of buffers) {
+        if (buffer == undefined) continue;
         const view = new Uint8Array(buffer);
         resultView.set(view, offset);
         offset += view.length;
@@ -84,7 +135,7 @@ function buffer_to_base64(buffer) {
 function pad_with(buffer, pad, length) {
     var buffer = buffer
     if (typeof buffer == "string") {
-        buffer = new TextEncoder().encode(buffer)
+        buffer = convertTextToBinary(buffer)
     }
     const new_buf = new Uint8Array(length)
     for (let i = 0; i < length; i++) {
@@ -97,12 +148,18 @@ function pad_with(buffer, pad, length) {
     return new_buf
 }
 
-function to_uuid(valuehi, valuelo) {
-    const buffer = new ArrayBuffer(16);
-    const view = new DataView(buffer);
-    view.setBigUint64(0, BigInt(valuehi), false); // Set the most significant bits
-    view.setBigUint64(8, BigInt(valuelo), false); // Set the least significant bits
-    return buffer;
+function to_uuid(uuidstring) {
+    if (typeof uuidstring !== 'string') {
+        return uuidstring
+    } else {
+        const bytes = uuidstring.replace(/-/g, '').match(/.{1,2}/g).map(byte => parseInt(byte, 16));
+        const buffer = new ArrayBuffer(16);
+        const view = new Uint8Array(buffer);
+        for (let i = 0; i < 16; i++) {
+            view[i] = bytes[i] || 0; // Default to 0 if undefined
+        }
+        return buffer;
+    }
 }
 
 class MineDataView {
@@ -131,7 +188,7 @@ class MineDataView {
         const length = this.get_varint();
         const stringBytes = this.buffer.slice(this.pointer, this.pointer + length);
         this.pointer += length;
-        return new TextDecoder("utf-8").decode(stringBytes);
+        return convertBinaryToText(stringBytes);
     }
 
     get_short() {
@@ -157,10 +214,35 @@ class MineDataView {
         return value
     }
 
+    get_ubyte() {
+        const value = this.view.getUint8(this.pointer, false)
+        this.pointer += 1
+        return value
+    }
+
+    get_bytes(length) {
+        if (length < 0) {
+            throw new Error("Length must be a non-negative integer.");
+        }
+        const bytes = this.buffer.slice(this.pointer, this.pointer + length);
+        this.pointer += length;
+        return bytes;
+    }
+
     get_byte_array() {
         const length = this.get_varint();
         const array = this.buffer.slice(this.pointer, this.pointer + length);
         this.pointer += length;
         return array;
+    }
+
+    get_nbt() {
+        if (!window.nbt) {
+            throw new Error("nbt.js has not been imported (yet).")
+        }
+        const nbt = nbt.parse(this.get_rest())
+        this.pointer += nbt.finalPosition
+        delete nbt.finalPosition
+        return nbt
     }
 }

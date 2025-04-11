@@ -1,47 +1,43 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
     <head>
-        <!-- <script src="erooodle.js"></script> -->
-        <link rel="icon" href="data:;base64,=">
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Jscraft - Play</title>
-        <script src="libraries/wisp.js"></script>
-        <script src="libraries/mc_hex_digest.js"></script>
-        <script src="libraries/jsencrypt.min.js"></script>
-        <script src="libraries/mc_encryption.js"></script>
-        <script src="libraries/mine_proxy_data.js"></script>
-        <script src="libraries/sha.js"></script>
-        <script src="libraries/pako.min.js"></script>
-        <script src="libraries/mine_verify.js"></script>
-        
-        <!-- MSAL authentication -->
+        <script src="constants.js"></script>
         <script src="libraries/libcurl_full.js"></script>
-        
-        <script src="mine_proxy_play.js"></script>
-        <script>
-            const params = new URLSearchParams(window.location.search)
-            const ip = params.get("ip")
-            const port = Number(params.get("port"))
-            
-            
-            var readies = 0
-            document.addEventListener("libcurl_load", ()=>{
-                libcurl.set_websocket("wss://wisp.mercurywork.shop/v86/");
-                console.log("libcurl.js ready!");
-                readies += 1
-                if (readies == 2) {
-                    begin()
-                }
-            });
-            proxy.addEventListener("open", function() {
-                readies += 1
-                if (readies == 2) {
-                    begin()
-                }
-            })
-            async function begin() {
-                const verified = await checkVerification()
-                if (verified) window.mine = new MinecraftConnection(ip, port)
+        <script src="libraries/wisp.js"></script>
+        <script src="libraries/pako.min.js"></script>
+        <script src="libraries/aesjs.js"></script>
+        <script src="libraries/jsencrypt.min.js"></script>
+        <script src="libraries/sha.js"></script>
+        <script src="libraries/forge.min.js"></script>
+        <script src="libraries/nbt.js"></script>
+        <script src="mine_proxy_data.js"></script>
+        <script src="packetlist.js"></script>
+        <script src="PacketWrapper.js"></script>
+        <script src="MinecraftConnection.js"></script>
+        <script src="mc_hex_digest.js"></script>
+        <script src="MinecraftVerifier.js"></script>
+        <style>
+            body {
+                font-family: 'Segoe UI', sans-serif;
+                background: #1e1e1e;
+                color: #eee;
+                margin: 0;
+                padding: auto;
+                height: 100%;
             }
-        </script>
+            .loading-title {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+            }
+        </style>
     </head>
+    <body>
+        <h1 class="loading-title" id="loading-title">Loading...</h1>
+        <script src="play.js"></script>
+    </body>
 </html>

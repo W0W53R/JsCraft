@@ -1,3 +1,7 @@
+// src/compat.mjs
+var RealCloseEvent = globalThis.CloseEvent || Event;
+var RealWS = globalThis.WebSocket;
+
 // src/polyfill.mjs
 var _wisp_connections = {};
 var WispWebSocket = class extends EventTarget {
@@ -73,7 +77,7 @@ var WispWebSocket = class extends EventTarget {
       this.dispatchEvent(msg_event);
     });
     this.stream.addEventListener("close", (event) => {
-      let close_event = new (globalThis.CloseEvent || Event)("close", { code: event.code });
+      let close_event = new RealCloseEvent("close", { code: event.code });
       this.onclose(close_event);
       this.dispatchEvent(close_event);
     });
@@ -138,7 +142,6 @@ var WispWebSocket = class extends EventTarget {
 };
 
 // src/wisp.mjs
-RealWS = globalThis.WebSocket;
 var packet_types = {
   CONNECT: 1,
   DATA: 2,
@@ -172,13 +175,13 @@ function array_from_uint(int, size) {
 function concat_uint8array() {
   let total_length = 0;
   for (let array of arguments) {
-    total_length += array.length||array.byteLength;
+    total_length += array.length || array.byteLength;
   }
   let new_array = new Uint8Array(total_length);
   let index = 0;
   for (let array of arguments) {
     new_array.set(array, index);
-    index += array.length;
+    index += array.length || array.byteLength;
   }
   return new_array;
 }
@@ -260,7 +263,7 @@ var WispConnection = class extends EventTarget {
     };
     this.ws.onclose = () => {
       this.on_ws_close();
-      let event = new (globalThis.CloseEvent || Event)("close");
+      let event = new RealCloseEvent("close");
       this.dispatchEvent(event);
     };
     this.ws.onmessage = (event) => {
@@ -273,7 +276,7 @@ var WispConnection = class extends EventTarget {
     };
   }
   close_stream(stream, reason) {
-    let close_event = new (globalThis.CloseEvent || Event)("close", { code: reason });
+    let close_event = new RealCloseEvent("close", { code: reason });
     stream.open = false;
     stream.dispatchEvent(close_event);
     delete this.active_streams[stream.stream_id];

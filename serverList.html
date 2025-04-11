@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <title>Jscraft - List</title>
+        <script src="constants.js"></script>
+        <script src="libraries/libcurl_full.js"></script>
+        <script src="libraries/wisp.js"></script>
+        <script src="libraries/pako.min.js"></script>
+        <script src="mine_proxy_data.js"></script>
+        <script src="packetlist.js"></script>
+        <script src="PacketWrapper.js"></script>
+        <script src="MinecraftConnection.js"></script>
+        <script src="mc_hex_digest.js"></script>
+        <script src="serverList.js"></script>
+        <style>
+            body {
+                font-family: 'Segoe UI', sans-serif;
+                background: #1e1e1e;
+                color: #eee;
+                margin: 0;
+                padding: 20px;
+            }
+        
+            h1 {
+                text-align: center;
+                margin-bottom: 30px;
+            }
+        
+            .server-list {
+                display: flex;
+                flex-wrap: wrap;
+                justify-content: center;
+                gap: 20px;
+            }
+        
+            .server-card {
+                background-color: #2a2a2a;
+                border: 1px solid #444;
+                border-radius: 8px;
+                padding: 20px;
+                width: 280px;
+                text-align: center;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+                transition: transform 0.2s ease;
+            }
+        
+            .server-card:hover {
+                transform: translateY(-4px);
+            }
+        
+            .favicon {
+                width: 64px;
+                height: 64px;
+                margin-bottom: 10px;
+            }
+        
+            .status-ok {
+                color: #00ff7f;
+            }
+        
+            .status-error {
+                color: #ff4c4c;
+            }
+            .bottom-bar {
+                position: fixed;
+                bottom: 0;
+                left: 0;
+                width: 100%;
+                background: #2e2e2e;
+                display: flex;
+                justify-content: center;
+                gap: 20px;
+                padding: 15px;
+                border-top: 1px solid #444;
+            }
+
+            .bottom-bar button {
+                padding: 10px 20px;
+                font-size: 16px;
+                font-weight: bold;
+                background: #3e3e3e;
+                color: #fff;
+                border: 1px solid #666;
+                border-radius: 6px;
+                cursor: pointer;
+                transition: background 0.2s ease;
+            }
+
+            .bottom-bar button:hover {
+                background: #575757;
+            }
+
+            .server-card.selected {
+                border: 2px solid #00ffff;
+            }
+        </style>        
+    </head>
+    <body>
+        <h1>Minecraft Server List</h1>
+        <div id="server-list" class="server-list"></div>
+    
+        <div class="bottom-bar">
+            <button onclick="promptAddServer()">➕ Add Server</button>
+            <button onclick="deleteSelectedServer()">🗑️ Delete Server</button>
+            <button onclick="loadServerList()">🔁 Reload List</button>
+            <button onclick="joinSelectedServer()">🎮 Join Server</button>
+        </div>
+    </body>       
+</html>

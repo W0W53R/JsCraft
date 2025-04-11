@@ -1,213 +1,41 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <script src="erooodle.js"></script>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Jscraft - Verify</title>
+        <script src="constants.js"></script>
         <script src="libraries/libcurl_full.js"></script>
-        <title>Jscraft - Authenticate</title>
-        <script>
-            /*
-            Try minecraft token
-            if success:
-                update access token
-            if fail:
-                Try refresh token
-                if success:
-                    use refresh token to get minecraft token
-                if fail:
-                    tell user to use this page
-            */
-            function urlEncode(object) {
-                let out = []
-                Object.keys(object).forEach(function(key){
-                    const value = object[key]
-                    console.warn(key, value)
-                    out.push(encodeURIComponent(key) + "=" + encodeURIComponent(value))
-                })
-                return out.join("&")
-            }
-
-            async function useRefreshToken(refresh_token) {
-                const data = await libcurl.fetch("https://login.live.com/oauth20_token.srf", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded",
-                        "Accept": "application/json"
-                    },
-                    body: urlEncode({
-                        "scope": "service::user.auth.xboxlive.com::MBI_SSL",
-                        "client_id": "00000000402B5328",
-                        "grant_type": "refresh_token",
-                        "refresh_token": refresh_token
-                    })
-                })
-                if (!data.ok) {
-                    return false
-                }
-                const back = await data.json()
-                const microsoft_access_token = back.access_token.toString()
-                const microsoft_refresh_token = back.refresh_token
-                console.log("Access Token: ", microsoft_access_token)
-                console.log("Refresh Token: ", microsoft_refresh_token)
-                localStorage.setItem("jscraft.ms_refresh_token", microsoft_refresh_token)
-                return microsoft_access_token
-            }
-            async function useAccessToken(microsoft_access_token) {
-                const xbl_auth = await libcurl.fetch("https://user.auth.xboxlive.com/user/authenticate", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json"
-                    },
-                    body: JSON.stringify({
-                        "Properties": {
-                            "AuthMethod": "RPS",
-                            "SiteName": "user.auth.xboxlive.com",
-                            "RpsTicket": microsoft_access_token
-                        },
-                        "RelyingParty": "http://auth.xboxlive.com",
-                        "TokenType": "JWT"
-                    })
-                });
-                if (!xbl_auth.ok) {
-                    alert("The protocol failed!")
-                    return;
-                }
-                const xbl_json = await xbl_auth.json()
-                const xbl_token = xbl_json.Token
-                
-                const xsts_auth = await libcurl.fetch("https://xsts.auth.xboxlive.com/xsts/authorize", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json"
-                    },
-                    body: JSON.stringify({
-                        "Properties": {
-                            "SandboxId": "RETAIL",
-                            "UserTokens": [xbl_token]
-                        },
-                        "RelyingParty": "rp://api.minecraftservices.com/",
-                        "TokenType": "JWT"
-                    })
-                });
-                if (!xsts_auth.ok) {
-                    alert("The protocol failed!")
-                    return;
-                }
-                const xsts_json = await xsts_auth.json()
-                xsts_userhash = xsts_json.DisplayClaims.xui[0].uhs
-                xsts_token = xsts_json.Token
-                
-                const mine_auth = await libcurl.fetch("https://api.minecraftservices.com/authentication/login_with_xbox", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/json",
-                        "Accept": "application/json"
-                    },
-                    body: JSON.stringify({
-                        "identityToken": `XBL3.0 x=${xsts_userhash};${xsts_token}`
-                    })
-                })
-                const mine_json = await mine_auth.json()
-                const mine_token = mine_json.access_token
-                localStorage.setItem("jscraft.mc_token", mine_token)
-                return mine_token
-            }
-            async function getUUIDFromMineToken(mine_token) {
-                const mine_data = await libcurl.fetch("https://api.minecraftservices.com/minecraft/profile", {
-                    method: "GET",
-                    headers: {
-                        "Content-Type": "application/json",
-                        Authorization: "Bearer " + mine_token,
-                        "Accept": "application/json"
-                    }
-                })
-                if (!mine_data.ok) {
-                    return false;
-                }
-                const mine_data_json = await mine_data.json();
-                username = mine_data_json["name"];
-                uuid = mine_data_json["id"];
-                console.log("Minecraft Username:", username);
-                console.log("Minecraft UUID:", uuid);
-                return uuid;
-            }
-
-            document.addEventListener("libcurl_load", ()=>{
-                libcurl.set_websocket("wss://wisp.mercurywork.shop/v86/");
-                console.log("libcurl.js ready!");
-                libcurl.stdout = console.error
-                libcurl.stderr = console.warn
-            });
-            document.addEventListener("DOMContentLoaded", function() {
-                window.auth.addEventListener("click", function() {
-                    alert("A window will open. Sign in and, when you reach a blank page, copy the URL and paste it here")
-                    window.open("https://login.live.com/oauth20_authorize.srf?client_id=00000000402B5328&redirect_uri=https://login.live.com/oauth20_desktop.srf&response_type=code&scope=service::user.auth.xboxlive.com::MBI_SSL")
-                    window.step1.classList = ["disabled"]
-                    window.step2.classList = ["enabled"]
-                });
-                window.submit_blank_url.addEventListener("click", async function() {
-                    const blank_url = window.blank_url.value
-                    const code = blank_url.split("code=")[1].split("&")[0]
-                    const microsoft_auth = await libcurl.fetch("https://login.live.com/oauth20_token.srf", {
-                        method: "POST",
-                        headers: {
-                            "Content-Type": "application/x-www-form-urlencoded",
-                            "Accept": "application/json"
-                        },
-                        body: urlEncode({
-                            "client_id": "00000000402B5328", // minecraft launcher
-                            "scope": "service::user.auth.xboxlive.com::MBI_SSL",
-                            "code": code,
-                            "redirect_uri": "https://login.live.com/oauth20_desktop.srf",
-                            "grant_type": "authorization_code"
-                        })
-                    })
-                    console.log(microsoft_auth)
-                    if (!microsoft_auth.ok) {
-                        alert("The protocol failed!")
-                        return;
-                    }
-                    console.log(microsoft_auth)
-                    const auth_json = await microsoft_auth.json()
-                    const microsoft_access_token = auth_json.access_token.toString()
-                    const microsoft_refresh_token = auth_json.refresh_token
-                    console.log("Access Token: ", microsoft_access_token)
-                    console.log("Refresh Token: ", microsoft_refresh_token)
-                    localStorage.setItem("jscraft.ms_refresh_token", microsoft_refresh_token)
-                    
-                    const mine_token = useAccessToken(microsoft_access_token)
-                    
-                    const uuid = getUUIDFromMineToken(mine_token)
-                    
-                    window.step2.classList = ["disabled"]
-                    window.step3.classList = ["enabled"]
-                });
-            });
-        </script>
+        <script src="libraries/pako.min.js"></script>
+        <script src="libraries/aesjs.js"></script>
+        <script src="MinecraftVerifier.js"></script>
+        
         <style>
-            * {
+            body {
+                font-family: 'Segoe UI', sans-serif;
+                background: #1e1e1e;
+                color: #eee;
+                margin: 0;
+                padding: auto;
+                height: 100%;
+            }
+            .loading-title {
+                position: absolute;
+                top: 50%;
+                left: 50%;
+                transform: translate(-50%, -50%);
+                font-size: 24px;
                 text-align: center;
-            }
-            .enabled {
-                display: block;
-            }
-            .disabled {
-                display: none;
             }
         </style>
     </head>
     <body>
-        <div id="step1" class="enabled">
-            <button id="auth">Authenticate</button>
+        <div class="loading-title">
+            <h1 id="loading-title">Checking Verification...</h1>
+            <input type="text" id="blank_url" placeholder="Paste the URL here" style="width: 80%; margin-top: 20px;" />
+            <button id="submit_blank_url">Submit Blank URL</button>
         </div>
-        <div id="step2" class="disabled">
-            <input id="blank_url" placeholder="Blank url here">
-            <button id="submit_blank_url">Submit</button>
-        </div>
-        <div id="step3" class="disabled">
-            <h1>You have successfully signed in. Your access token is usable for another 24 hours, and the refresh token will last 90 days!</h1>
-            <a href="./index.html">Back to server list</a>
-        </div>
+        <script src="verify.js"></script>
     </body>
+    
 </html>
