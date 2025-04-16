@@ -13,10 +13,8 @@ function convertBinaryToText(string) {
  * @returns {Promise<string>} The Minecraft-style hash as a hexadecimal string.
  */
 async function mcHexDigest(serverId, sharedSecret, publicKey) {
-  console.log(sharedSecret, " |---| ", publicKey)
   sharedSecret = new Uint8Array(sharedSecret); // Ensure sharedSecret is a Uint8Array
   publicKey = new Uint8Array(publicKey); // Ensure publicKey is a Uint8Array
-  console.log("Calcuating hex digest from: ", serverId, sharedSecret, publicKey)
 
   // Convert the serverId string to UTF-8 bytes.
   const serverIdBytes = convertTextToBinary(serverId);

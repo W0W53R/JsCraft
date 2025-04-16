@@ -197,23 +197,7 @@ class ResetChatConfigurationPacket extends Packet {
 }
 class RegistryDataConfigurationPacket extends Packet {
     constructor(registryId, registries) {
-        const registryData = join_buffer(
-            to_varint(registryId),
-            to_varint(registries.length),
-            ...registries.map(registry => {
-                return join_buffer(
-                    to_string(registry.name),
-                    to_varint(registry.entries.length),
-                    ...registry.entries.map(entry => {
-                        return join_buffer(
-                            to_string(entry.name),
-                            entry.id != undefined ? to_varint(entry.id) : new ArrayBuffer() // Handle optional ID
-                        );
-                    })
-                );
-            })
-        );
-        super(0x07, registryData);
+        super(0x07, new ArrayBuffer());
         this.registries = registries;
         this.registryId = registryId;
     }
@@ -269,17 +253,7 @@ class FeatureFlagsConfigurationPacket extends Packet {
 }
 class UpdateTagsConfigurationPacket extends Packet {
     constructor(tags) {
-        const tagsBuffer = join_buffer(
-            to_varint(tags.length),
-            ...tags.map(tag => {
-                return join_buffer(
-                    to_string(tag.name),
-                    to_varint(tag.ids.length),
-                    ...tag.ids.map(id => to_varint(id))
-                );
-            })
-        );
-        super(0x0D, tagsBuffer);
+        super(0x0D);
         this.tags = tags;
     }
 }
@@ -431,10 +405,8 @@ class LoginPlayPacket extends Packet {
         super(0x2c,
             to_int(entityId),
             to_boolean(isHardcore),
-            to_varint(dimensionNames),
-            ...dimensionNames.map((dim)=>{
-                to_string(dim)
-            }),
+            to_varint(dimensionNames.length),
+            ...dimensionNames.map((dim)=>{ to_string(dim) }),
             to_varint(maxPlayers),
             to_varint(viewDistance),
             to_varint(simulationDistance),
@@ -442,7 +414,7 @@ class LoginPlayPacket extends Packet {
             to_boolean(enableRespawnScreen),
             to_boolean(doLimitedCrafting),
             to_varint(dimensionType),
-            to_varint(dimensionName),
+            to_string(dimensionName),
             to_long(hashedSeed),
             to_ubyte(gameMode),
             to_byte(previousGameMode),
@@ -450,8 +422,176 @@ class LoginPlayPacket extends Packet {
             to_boolean(isFlat),
             to_boolean(hasDeathLocation),
             hasDeathLocation ? to_string(deathDimensionName) : undefined,
-            hasDeathLocation ? to_string(deathDimensionName) : undefined,
-            
+            deathLocation ? to_string(deathLocation) : undefined,
+            to_varint(portalCooldown),
+            to_varint(seaLevel),
+            to_boolean(enforcesSecureChat)
+        );
+
+        this.entityId = entityId;
+        this.isHardcore = isHardcore;
+        this.dimensionNames = dimensionNames;
+        this.maxPlayers = maxPlayers;
+        this.viewDistance = viewDistance;
+        this.simulationDistance = simulationDistance;
+        this.reducedDebugInfo = reducedDebugInfo;
+        this.enableRespawnScreen = enableRespawnScreen;
+        this.doLimitedCrafting = doLimitedCrafting;
+        this.dimensionType = dimensionType;
+        this.dimensionName = dimensionName;
+        this.hashedSeed = hashedSeed;
+        this.gameMode = gameMode;
+        this.previousGameMode = previousGameMode;
+        this.isDebug = isDebug;
+        this.isFlat = isFlat;
+        this.hasDeathLocation = hasDeathLocation;
+        this.deathDimensionName = deathDimensionName;
+        this.deathLocation = deathLocation;
+        this.portalCooldown = portalCooldown;
+        this.seaLevel = seaLevel;
+        this.enforcesSecureChat = enforcesSecureChat;
+    }
+}
+class SynchronizePlayerPositionPlayPacket extends Packet {
+    constructor(teleportId, x, y, z, vx, vy, vz, yaw, pitch, flags) {
+        super(0x42,
+            to_varint(teleportId),
+            to_double(x),
+            to_double(y),
+            to_double(z),
+            to_double(vx),
+            to_double(vy),
+            to_double(vz),
+            to_float(yaw),
+            to_float(pitch),
+            to_int(flags)
         )
+        this.teleportId = teleportId;
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.vx = vx;
+        this.vy = vy;
+        this.vz = vz;
+        this.yaw = yaw;
+        this.pitch = pitch;
+        this.flags = flags;
+    }
+}
+class ConfirmTeleportationPlayPacket extends Packet {
+    constructor(teleportId) {
+        super(0x00,
+            to_varint(teleportId)
+        )
+    }
+}
+class ChangeDifficultyPlayPacket extends Packet {
+    constructor(difficulty, locked) {
+        super(0x0b,
+            to_byte(difficulty),
+            to_boolean(locked)
+        )
+    }
+}
+class PlayerAbilitesPlayPacket extends Packet {
+    constructor(flags, flyingSpeed, fovModifier) {
+        super(0x3a,
+            to_byte(flags),
+            to_float(flyingSpeed),
+            to_float(fovModifier)
+        )
+        this.flags = flags;
+        this.flyingSpeed = flyingSpeed;
+        this.fovModifier = fovModifier;
+    }
+}
+class ClientboundSetHeldItemPlayPacket extends Packet {
+    constructor(slot) {
+        super(0x63, to_varint(slot))
+        this.slot = slot
+    }
+}
+class UpdateRecipesPlayPacket extends Packet {
+    constructor(properties, stonecutterRecipes) {
+        super(
+            0x7e,
+            to_varint(properties.length),
+            ...properties.map(function(property){
+                return join_buffer(
+                    to_string(property.setId),
+                    to_varint(property.value.length),
+                    ...property.value.map(to_varint)
+                )
+            }),
+            to_varint(stonecutterRecipes.length),
+            ...stonecutterRecipes.map(function(recipe){
+                return join_buffer(
+                    to_varint(recipe.idType),
+                    ...(recipe.idType == 0 
+                    ? [to_string(recipe.name) ]
+                    : recipe.ids.map(to_varint))
+                )
+            })
+        )
+    }
+}
+class EntityEventPlayPacket extends Packet {
+    constructor(entityId, entityStatus) {
+        super(0x1f,
+            to_int(entityId),
+            to_byte(entityStatus)
+        )
+        this.entityId = entityId;
+        this.entityStatus = entityStatus;
+    }
+}
+class CommandsPlayPacket extends Packet {
+    constructor(nodes, startNode) {
+        super(0x11)
+        this.nodes = nodes
+        this.startNode = startNode
+    }
+}
+class RecipeBookSettingsPlayPacket extends Packet {
+    constructor(
+        craftingBookOpen, craftingBookFilterActive, smeltingBookOpen, 
+        smeltingBookFilterActive, blastFurnaceBookOpen, blastFurnaceBookFilterActive, 
+        smokerBookOpen, smokerBookFilterActive) {
+        super(0x46,
+            to_boolean(craftingBookOpen),
+            to_boolean(craftingBookFilterActive),
+            to_boolean(smeltingBookOpen),
+            to_boolean(smeltingBookFilterActive),
+            to_boolean(blastFurnaceBookOpen),
+            to_boolean(blastFurnaceBookFilterActive),
+            to_boolean(smokerBookOpen),
+            to_boolean(smokerBookFilterActive)
+        )
+        this.craftingBookOpen = craftingBookOpen
+        this.craftingBookFilterActive = craftingBookFilterActive
+        this.smeltingBookOpen = smeltingBookOpen
+        this.smeltingBookFilterActive = smeltingBookFilterActive
+        this.blastFurnaceBookOpen = blastFurnaceBookOpen
+        this.blastFurnaceBookFilterActive = blastFurnaceBookFilterActive
+        this.smokerBookOpen = smokerBookOpen
+        this.smokerBookFilterActive = smokerBookFilterActive
+    }
+}
+class RecipeBookAddPlayPacket extends Packet {
+    constructor(recipes, replace) {
+        super(0x44)
+    }
+}
+class ServerDataPlayPacket extends Packet {
+    constructor(motd, icon) {
+        super(0x50)
+        this.motd = motd
+        this.icon = icon
+    }
+}
+class PlayerInfoUpdatePlayPacket extends Packet {
+    constructor(players) {
+        super(0x40)
+        this.players = players
     }
 }

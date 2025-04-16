@@ -44,7 +44,7 @@ class PacketWrapper { // Only for Clientbound packets
                             const thisSkin = []
                             thisSkin.push(reader.get_string()); // Name
                             thisSkin.push(reader.get_string()); // Value
-                            if (reader.get_byte() !== 0) { // Has Signature
+                            if (reader.get_boolean()) { // Has Signature
                                 thisSkin.push(reader.get_string()); // Signature
                             }
                             skinData.push(thisSkin);
@@ -93,20 +93,14 @@ class PacketWrapper { // Only for Clientbound packets
                         case 0x06: // Reset Chat
                             return new ResetChatConfigurationPacket();
                         case 0x07: { // Registry Data
-                            const registryId = reader.get_varint();
+                            const registryId = reader.get_string();
                             const registryCount = reader.get_varint();
-                            const registries = [];
+                            const registries = {};
                             for (let i = 0; i < registryCount; i++) {
                                 const name = reader.get_string();
-                                const entryCount = reader.get_varint();
-                                const entries = [];
-                                for (let j = 0; j < entryCount; j++) {
-                                    const entryName = reader.get_string();
-                                    const hasData = reader.get_byte() !== 0;
-                                    const data = hasData ? reader.get_nbt() : undefined
-                                    entries[entryName] = data
-                                }
-                                registries.push({ name, entries });
+                                const hasData = reader.get_boolean();
+                                const data = hasData ? reader.get_nbt().value : undefined
+                                registries[name] = data
                             }
                             return new RegistryDataConfigurationPacket(registryId, registries);
                         }
@@ -117,7 +111,7 @@ class PacketWrapper { // Only for Clientbound packets
                                 reader.get_uuid(),
                                 reader.get_string(),
                                 reader.get_byte_array(),
-                                reader.get_byte() !== 0,
+                                reader.get_boolean(),
                                 reader.get_string()
                             );
                         case 0x0A: // Store Cookie
@@ -139,18 +133,25 @@ class PacketWrapper { // Only for Clientbound packets
                             return new FeatureFlagsConfigurationPacket(flags);
                         }
                         case 0x0D: { // Update Tags
-                            const tagCount = reader.get_varint();
-                            const tags = [];
-                            for (let i = 0; i < tagCount; i++) {
-                                const name = reader.get_string();
-                                const idCount = reader.get_varint();
-                                const ids = [];
-                                for (let j = 0; j < idCount; j++) {
-                                    ids.push(reader.get_varint());
+                            const tagsObject = {}
+                            const howMany = reader.get_varint();
+                            for (let i = 0; i < howMany; i++) {
+                                const tagObject = {}
+                                const tagName = reader.get_string();
+                                const subTagCount = reader.get_varint();
+                                for (let j = 0; j < subTagCount; j++) {
+                                    const ids = []
+                                    const subTagName = reader.get_string();
+                                    const numberOfIds = reader.get_varint();
+                                    for (let k = 0; k < numberOfIds; k++) {
+                                        const id = reader.get_varint()
+                                        ids.push(id)
+                                    }
+                                    tagObject[subTagName] = ids
                                 }
-                                tags.push({ name, ids });
+                                tagsObject[tagName] = tagObject
                             }
-                            return new UpdateTagsConfigurationPacket(tags);
+                            return new UpdateTagsConfigurationPacket(tagsObject)
                         }
                         case 0x0E: { // Known Packs
                             const packCount = reader.get_varint();
@@ -178,7 +179,7 @@ class PacketWrapper { // Only for Clientbound packets
                             const count = reader.get_varint();
                             const links = [];
                             for (let i = 0; i < count; i++) {
-                                const isBuiltin = reader.get_byte() !== 0;
+                                const isBuiltin = reader.get_boolean();
                                 const nameOrId = isBuiltin ? reader.get_varint() : reader.get_string();
                                 const url = reader.get_string();
                                 links.push({
@@ -195,11 +196,11 @@ class PacketWrapper { // Only for Clientbound packets
                                 reader.get_string(),
                                 reader.get_byte(),
                                 reader.get_varint(),
-                                reader.get_byte() !== 0,
+                                reader.get_boolean(),
                                 reader.get_ubyte(),
                                 reader.get_varint(),
-                                reader.get_byte() !== 0,
-                                reader.get_byte() !== 0,
+                                reader.get_boolean(),
+                                reader.get_boolean(),
                                 reader.get_varint()
                             );
                         case 0x12: // Cookie Response
@@ -241,7 +242,169 @@ class PacketWrapper { // Only for Clientbound packets
             case MinecraftConnection.STATE.PLAY:
                 switch (id) {
                     case(0x2c): {
-                        return new LoginPlayPacket() // TODO:
+                        var hasDeathLocation;
+                        return new LoginPlayPacket(
+                            reader.get_int(),
+                            reader.get_boolean(),
+                            Array.from({ length: reader.get_varint() }, function(){
+                                return reader.get_string()
+                            }),
+                            reader.get_varint(),
+                            reader.get_varint(),
+                            reader.get_varint(),
+                            reader.get_boolean(),
+                            reader.get_boolean(),
+                            reader.get_boolean(),
+                            reader.get_varint(),
+                            reader.get_string(),
+                            reader.get_long(),
+                            reader.get_ubyte(),
+                            reader.get_byte(),
+                            reader.get_boolean(),
+                            reader.get_boolean(),
+                            hasDeathLocation = reader.get_boolean(),
+                            hasDeathLocation ? reader.get_string() : undefined,
+                            hasDeathLocation ? reader.get_string() : undefined,
+                            reader.get_varint(),
+                            reader.get_varint(),
+                            reader.get_boolean()
+                        )
+                    }
+                    case(0x42): {
+                        return new SynchronizePlayerPositionPlayPacket(
+                            reader.get_varint(),
+                            reader.get_double(),
+                            reader.get_double(),
+                            reader.get_double(),
+                            reader.get_double(),
+                            reader.get_double(),
+                            reader.get_double(),
+                            reader.get_float(),
+                            reader.get_float(),
+                            reader.get_int()
+                        )
+                    }
+                    case(0x0b): {
+                        return new ChangeDifficultyPlayPacket(
+                            reader.get_byte(),
+                            reader.get_byte !== 0
+                        )
+                    }
+                    case(0x3a): {
+                        return new PlayerAbilitesPlayPacket(
+                            reader.get_byte(),
+                            reader.get_float(),
+                            reader.get_float()
+                        )
+                    }
+                    case(0x63): {
+                        return new ClientboundSetHeldItemPlayPacket(
+                            reader.get_varint()
+                        )
+                    }
+                    case(0x7e): {
+                        return new Packet(0x7e) // Update Recipes Play Packet
+                    }
+                    case(0x1f): {
+                        return new EntityEventPlayPacket(
+                            reader.get_int(),
+                            reader.get_byte()
+                        )
+                    }
+                    case(0x11): {
+                        const commands = []
+                        const commandNumber = reader.get_varint()
+                        for (let i = 0; i < commandNumber; i++) {
+                            const command = reader.get_command_node()
+                            commands.push(command)
+                        }
+                        const rootIndex = reader.get_varint()
+                        return new CommandsPlayPacket(commands, rootIndex)
+                    }
+                    case(0x46): {
+                        return new RecipeBookSettingsPlayPacket(
+                            reader.get_boolean(),
+                            reader.get_boolean(),
+                            reader.get_boolean(),
+                            reader.get_boolean(),
+                            reader.get_boolean(),
+                            reader.get_boolean(),
+                            reader.get_boolean(),
+                            reader.get_boolean()
+                        )
+                    }
+                    case(0x44): {
+                        return new RecipeBookAddPlayPacket()
+                    }
+                    case(0x50): {
+                        const motd = reader.get_text_component()
+                        var icon;
+                        if (reader.get_byte()) {
+                            icon = reader.get_byte_array()
+                        }
+                        return new ServerDataPlayPacket(
+                            motd,
+                            icon
+                        )
+                    }
+                    case(0x40): {
+                        var playerList = [] 
+                        const actions = reader.get_ubyte()
+                        const numberOfPlayers = reader.get_varint()
+                        for (let i = 0; i < numberOfPlayers; i++) {
+                            var playerData = {}
+                            playerData.uuid = reader.get_bytes(16)
+                            if (actions & 0x01) { // Add Player
+                                playerData.name = reader.get_string()
+                                playerData.properties = {}
+                                const properties = reader.get_varint()
+                                for (let j = 0; j < properties; j++) {
+                                    const data = {}
+                                    const key = reader.get_string()
+                                    data.value = reader.get_string()
+                                    const hasSignature = reader.get_byte()
+                                    if (hasSignature) {
+                                        data.signature = reader.get_string()
+                                    }
+                                    playerData.properties[key] = data
+                                }
+                            }
+                            if (actions & 0x02) { // Initalize Chat
+                                const hasData = reader.get_byte()
+                                if (hasData) {
+                                    playerData.chatSessionId = reader.get_bytes(16)
+                                    playerData.publicKeyExpiryTime = reader.get_long()
+                                    playerData.publicKey = reader.get_byte_array()
+                                    playerData.publicKeySignature = reader.get_byte_array()
+                                }
+                            }
+                            if (actions & 0x04) { // Game Mode
+                                playerData.gamemode = reader.get_varint()
+                            }
+                            if (actions & 0x08) { // Listed in <tab> menu
+                                playerData.listedInTabMenu = reader.get_boolean();
+                            }
+                            if (actions & 0x10) { // Update Latency
+                                playerData.latency = reader.get_varint()
+                            }
+                            if (actions & 0x20) { // Display name
+                                if (reader.get_boolean()) {
+                                    playerData.displayName = reader.get_text_component()
+                                }
+                            }
+                            if (actions & 0x40) { // Priority in <tab> menu
+                                playerData.priority = reader.get_varint()
+                            } 
+                            if (actions & 0x80) { // Update Hat
+                                playerData.hasHat = reader.get_boolean();
+                            }
+                            playerList.push(playerData)
+                        }
+                        return new PlayerInfoUpdatePlayPacket(playerList)
+                    }
+                    default: {
+                        console.log("Unknown Packet (" + id + ")", reader.get_rest())
+                        debugger;
                     }
                 }
                 break;

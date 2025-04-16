@@ -5,6 +5,9 @@ const port = parseInt(searchParams.get("port") || "25565");
 const wispConnection = new WispConnection(constants.WISP_URL);
 
 var registry = {}
+var worldData = {}
+var playerData = {}
+var entities = {}
 
 async function main() {
     await libcurl.load_wasm();
@@ -16,7 +19,7 @@ async function main() {
     });
 
     const verifier = new MinecraftVerifier();
-    if (!verifier.getVerified()) {
+    if (!await verifier.getVerified()) {
         return;
     }
 
@@ -27,7 +30,7 @@ async function main() {
     const connection = new MinecraftConnection(wispConnection, host, port);
     const wrapper = new PacketWrapper();
 
-    connection.sendPacket(new HandshakePacket(770, host, port, 2)); // Protocol version 766 for 1.20.6
+    connection.sendPacket(new HandshakePacket(769, host, port, 2)); // Protocol version 766 for 1.20.6
 
     connection.switchState(MinecraftConnection.STATE.LOGIN); // Switch to STATUS state
     wrapper.switchState(MinecraftConnection.STATE.LOGIN); // Ensure wrapper is in STATUS state
@@ -103,19 +106,21 @@ async function main() {
 
     connection.sendPacket(
         new ServerboundPluginMessageConfigurationPacket(
-            "development:random",
-            random
+            "minecraft:brand",
+            join_buffer(
+                to_string("vanilla")
+            )
         )
     )
     connection.sendPacket(
         new ClientInformationConfigurationPacket(
-            "en_US", // Locale
-            5,       // viewDistance
+            "en_us", // Locale
+            12,       // viewDistance
             0,       // chatMode
             true,    // chatColors
-            0x00,    // skinPart
+            0x7f,    // skinPart
             1,       // mainHand
-            false,   // textFiltering
+            true,   // textFiltering
             true,    // allowServerListings
             0        // particleStatus
         ) 
@@ -123,6 +128,7 @@ async function main() {
 
     var packet = wrapper.wrapPacket(await connection.getPacket())
     while (!(packet instanceof FinishConfigurationPacket)) {
+        console.log("Recieved Packet: ", packet)
         if (packet instanceof ConfigurationPluginMessageConfigurationPacket) {
             const channel = packet.channel
             const data = packet.data
@@ -137,7 +143,7 @@ async function main() {
         if (packet instanceof ClientboundKnownPacksConfigurationPacket) {
             const packs = packet.packs
             console.log("Server is asking if we know about these packs: ", packs)
-
+            
             connection.sendPacket(new ServerboundKnownPacksConfigurationPacket([]))
         }
         if (packet instanceof RegistryDataConfigurationPacket) {
@@ -156,6 +162,54 @@ async function main() {
         packet = wrapper.wrapPacket(await connection.getPacket())
     }
     connection.sendPacket(new AcknowledgeConfigurationPacket())
+
+    connection.switchState(MinecraftConnection.STATE.PLAY)
+    wrapper.switchState(MinecraftConnection.STATE.PLAY)
+
+    const loginPlayPacket = wrapper.wrapPacket(await connection.getPacket())
+    if (!loginPlayPacket instanceof LoginPlayPacket) {
+        throw new Error("Expected to get the login play packet, but instead got: ", loginPlayPacket)
+    }
+    console.log("Login Play Packet:", loginPlayPacket)
+    playerData.id = loginPlayPacket.entityId
+    entities[playerData.id] = {
+        name: "Player"
+    }
+
+    var packet = wrapper.wrapPacket(await connection.getPacket())
+    while (true) {
+        console.log("Recieved Packet: ", packet)
+        if (packet instanceof SynchronizePlayerPositionPlayPacket) {
+            connection.sendPacket(new ConfirmTeleportationPlayPacket(packet.teleportId))
+        }
+        if (packet instanceof PlayerAbilitesPlayPacket) {
+            console.log("Abilites: ", packet)
+        }
+        if (packet instanceof ClientboundSetHeldItemPlayPacket) {
+            console.log("Selected slot: ", packet.slot)
+        }
+        if (packet instanceof EntityEventPlayPacket) {
+            console.log("Set entity data of", entities[packet.entityId].name, "to", packet.entityStatus)
+            entities[packet.entityId].status = packet.entityStatus
+        }
+        if (packet instanceof CommandsPlayPacket) {
+            console.log("Added command tree: ", packet)
+        }
+        if (packet instanceof RecipeBookSettingsPlayPacket) {
+            console.log("Added recipe flags: ", packet)
+        }
+        if (packet instanceof RecipeBookAddPlayPacket) {
+            console.log("Added Recipes", packet)
+        }
+        if (packet instanceof ServerDataPlayPacket) {
+            console.log("Added server data: ", packet)
+        }
+        if (packet instanceof PlayerInfoUpdatePlayPacket) {
+            console.log("Updated player list: ", packet)
+        }
+
+        packet = wrapper.wrapPacket(await connection.getPacket())
+    }
 }
 
 main()

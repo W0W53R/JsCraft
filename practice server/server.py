@@ -3,11 +3,30 @@ import struct
 import io
 import os
 import hashlib
-import requests
+import requests, shutil
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 
+# --------------------
+# Packet Logging Functions
+# --------------------
+cwd = os.getcwd()
+if not os.path.isdir(os.path.join(cwd, "packets/")):
+    os.mkdir(os.path.join(cwd, "packets/"))
+else:
+    shutil.rmtree(os.path.join(cwd, "packets/"))
+    os.mkdir(os.path.join(cwd, "packets/"))
+
+current_packet_id = 0
+def log_packet(packet, name=None):
+    global current_packet_id
+    fileName = str(current_packet_id) + ".packet.bin"
+    if name:
+        fileName = name + "." + fileName
+    with open(os.path.join(cwd, "packets/") + fileName, "wb") as f:
+        f.write(packet)
+    current_packet_id += 1
 
 # --------------------
 # Utility Functions
@@ -68,7 +87,7 @@ def create_encryption_request_packet(public_key, verify_token):
     )
     pub_key_data = write_varint(len(pub_key_der)) + pub_key_der
     token_data = write_varint(len(verify_token)) + verify_token
-    payload = packet_id + server_id + pub_key_data + token_data
+    payload = packet_id + server_id + pub_key_data + token_data + b'\x00'
     return write_varint(len(payload)) + payload
 
 def create_set_compression_packet(threshold):
@@ -78,9 +97,9 @@ def create_set_compression_packet(threshold):
 
 def create_login_success_packet(uuid_str, username):
     packet_id = b'\x02'
-    uuid_encoded = write_varint(len(uuid_str)) + uuid_str.encode()
+    uuid_encoded = uuid_str.encode()
     username_encoded = write_varint(len(username)) + username.encode()
-    payload = packet_id + uuid_encoded + username_encoded
+    payload = packet_id + uuid_encoded + username_encoded + b"\x00"
     return write_varint(len(payload)) + payload
 
 def create_feature_flags_packet():
@@ -124,12 +143,12 @@ class EncryptedSocket:
     def recv_varint_packet(self):
         length = read_varint(self)
         data = self.recv(length)
-        return self.decryptor.update(data)
+        return data
 
     def recv(self, n):
         data = b''
         while len(data) < n:
-            chunk = self.sock.recv(n - len(data))
+            chunk = self.decryptor.update(self.sock.recv(n - len(data)))
             if not chunk:
                 raise ConnectionError("Socket closed during recv")
             data += chunk
@@ -137,19 +156,42 @@ class EncryptedSocket:
 
     def read(self, n):
         return self.recv(n)  # for read_varint compatibility
+class NotEncryptedSocket:
+    def __init__(self, sock):
+        self.sock = sock
+        self.compressed = False
+    
+    def send_packet(self, data):
+        self.sock.sendall(data)
+
+    def recv_varint_packet(self):
+        length = read_varint(self)
+        data = self.recv(length)
+        return data
+    
+    def recv(self, n):
+        data = b''
+        while len(data) < n:
+            chunk = self.sock.recv(n - len(data))
+            if not chunk:
+                raise ConnectionError("Socket closed during recv")
+            data += chunk
+        print("Got Data:",data)
+        return data
 
 
 # --------------------
 # Protocol Phase Handlers
 # --------------------
 def read_login_phase_packets(enc_sock):
-    for expected_id in [0x03, 0x04]:  # Login Acknowledge, Client Info
+    for expected_id in [0x03, 0x04, 0x05, 0x06, 0x07, 0x08]:  # Login Acknowledge, Client Info
         data = enc_sock.recv_varint_packet()
         buffer = io.BytesIO(data)
         packet_id = read_varint(buffer)
         print(f"[<] Received Login Packet ID: 0x{packet_id:02X}")
+        log_packet(buffer.getvalue(), "login")
         if packet_id != expected_id:
-            raise ValueError(f"Expected packet ID 0x{expected_id:02X}")
+            print(f"Expected packet ID 0x{expected_id:02X}")
 
 def read_serverbound_known_packs(enc_sock):
     data = enc_sock.recv_varint_packet()
@@ -205,28 +247,28 @@ def handle_client(conn, addr, private_key, public_key, verify_token):
             raise ValueError("Verify token mismatch")
 
         # Step 5: Mojang session verification
-        server_hash = generate_server_hash("", shared_secret, public_key.public_bytes(
-            encoding=serialization.Encoding.DER,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo
-        ))
-        response = requests.get("https://sessionserver.mojang.com/session/minecraft/hasJoined", params={
-            "username": username,
-            "serverId": server_hash
-        })
-        response.raise_for_status()
-        profile = response.json()
-        uuid = profile["id"]
-        print(f"[+] Verified session with Mojang. UUID: {uuid}")
+        # server_hash = generate_server_hash("", shared_secret, public_key.public_bytes(
+        #     encoding=serialization.Encoding.DER,
+        #     format=serialization.PublicFormat.SubjectPublicKeyInfo
+        # ))
+        # response = requests.get("https://sessionserver.mojang.com/session/minecraft/hasJoined", params={
+        #     "username": username,
+        #     "serverId": server_hash
+        # })
+        # response.raise_for_status()
+        # profile = response.json()
+        # uuid = profile["id"]
+        # print(f"[+] Verified session with Mojang. UUID: {uuid}")
 
         # Step 6: Enable AES encryption
         enc_sock = EncryptedSocket(conn, shared_secret)
 
         # Step 7: Set Compression
-        enc_sock.send_packet(create_set_compression_packet(256))
-        print("[>] Sent Set Compression")
+        # enc_sock.send_packet(create_set_compression_packet(256))
+        # print("[>] Sent Set Compression")
 
         # Step 8: Login Success
-        enc_sock.send_packet(create_login_success_packet(uuid, username))
+        enc_sock.send_packet(create_login_success_packet("1234567890123456", username))
         print("[>] Sent Login Success")
 
         # Step 9: Login Phase Packets
@@ -249,6 +291,7 @@ def handle_client(conn, addr, private_key, public_key, verify_token):
 
     except Exception as e:
         print(f"[!] Error handling client: {e}")
+        raise e
     finally:
         conn.close()
 

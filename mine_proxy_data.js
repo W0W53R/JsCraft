@@ -1,3 +1,4 @@
+const COMPONENT_TYPE = {"minecraft:custom_data": 0,"minecraft:max_stack_size": 1,"minecraft:max_damage": 2,"minecraft:damage": 3,"minecraft:unbreakable": 4,"minecraft:custom_name": 5,"minecraft:item_name": 6,"minecraft:item_model": 7,"minecraft:lore": 8,"minecraft:rarity": 9,"minecraft:enchantments": 10,"minecraft:can_place_on": 11,"minecraft:can_break": 12,"minecraft:attribute_modifiers": 13,"minecraft:custom_model_data": 14,"minecraft:tooltip_display": 15,"minecraft:repair_cost": 16,"minecraft:creative_slot_lock": 17,"minecraft:enchantment_glint_override": 18,"minecraft:intangible_projectile": 19,"minecraft:food": 20,"minecraft:consumable": 21,"minecraft:use_remainder": 22,"minecraft:use_cooldown": 23,"minecraft:damage_resistant": 24,"minecraft:weapon": 26,"minecraft:enchantable": 27,"minecraft:equippable": 28,"minecraft:repairable": 29,"minecraft:glider": 30,"minecraft:tooltip_style": 31,"minecraft:death_protection": 32,"minecraft:blocks_attacks": 33,"minecraft:stored_enchantments": 34,"minecraft:dyed_color": 35,"minecraft:map_color": 36,"minecraft:map_id": 37,"minecraft:map_decorations": 38,"minecraft:map_post_processing": 39,"minecraft:charged_projectiles": 40,"minecraft:bundle_contents": 41,"minecraft:potion_contents": 42,"minecraft:potion_duration_scale": 43,"minecraft:suspicious_stew_effects": 44,"minecraft:writable_book_content": 45,"minecraft:written_book_content": 46,"minecraft:trim": 47,"minecraft:debug_stick_state": 48,"minecraft:entity_data": 49,"minecraft:bucket_entity_data": 50,"minecraft:block_entity_data": 51,"minecraft:instrument": 52,"minecraft:provides_trim_material": 53,"minecraft:ominous_bottle_amplifier": 54,"minecraft:jukebox_playable": 55,"minecraft:provides_banner_pattern": 56,"minecraft:recipes": 57,"minecraft:lodestone_tracker": 58,"minecraft:firework_explosion": 59,"minecraft:fireworks": 60,"minecraft:profile": 61,"minecraft:banner_patterns": 63,"minecraft:base_color": 64,"minecraft:pot_decorations": 65,"minecraft:block_state": 67,"minecraft:bees": 68,"minecraft:lock": 69,"minecraft:container_loot": 70,"minecraft:break_sound": 71}
 function to_short(number) {
     if (!Number.isInteger(number) || number < -32768 || number > 32767) {
         throw new Error("Input must be an integer between -32768 and 32767.");
@@ -61,6 +62,20 @@ function to_long(number) {
     return buffer;
 }
 
+function to_double(number) {
+    const buffer = new ArrayBuffer(8)
+    const view = new Float64Array(buffer)
+    view[0] = number
+    return buffer
+}
+
+function to_float(number) {
+    const buffer = new ArrayBuffer(4)
+    const view = new Float32Array(buffer)
+    view[0] = number
+    return buffer
+}
+
 function to_varint(number) {
     if (!Number.isInteger(number) || number < -2147483647 || number > 2147483647) {
         throw new Error("Input must be an integer between -2147483647 and 2147483647.");
@@ -93,6 +108,7 @@ function to_bytearray(bytes) {
     const size = (bytes.length || bytes.byteLength) || 0
     return join_buffer(to_varint(size), bytes)
 }
+
 function to_boolean(boolean) {
     if (!(typeof boolean === "boolean")) {
         throw new TypeError("to_boolean(boolean): boolean is not of type Boolean")
@@ -109,7 +125,7 @@ function to_position(x, y, z) {
 
 function join_buffer(...buffers) {
     // Calculate the total byte length of all buffers
-    const totalLength = buffers.reduce((sum, buffer) => sum + (buffer.length||buffer.byteLength), 0);
+    const totalLength = buffers.reduce((sum, buffer) => sum + (buffer ? buffer.length||buffer.byteLength : 0), 0);
 
     // Create a new ArrayBuffer with the combined length
     const resultBuffer = new ArrayBuffer(totalLength);
@@ -183,6 +199,7 @@ class MineDataView {
 
         return value;
     }
+    
 
     get_string() {
         const length = this.get_varint();
@@ -191,11 +208,40 @@ class MineDataView {
         return convertBinaryToText(stringBytes);
     }
 
+    get_uint() {
+        const value = this.view.getUint32(this.pointer, false)
+        this.pointer += 4;
+        return value;
+    }
+
+    get_int() {
+        const value = this.view.getInt32(this.pointer, false)
+        this.pointer += 4;
+        return value
+    }
+
     get_short() {
-        window.thisView = this.view
         const value = this.view.getInt16(this.pointer, false);
         this.pointer += 2;
         return value;
+    }
+
+    get_ushort() {
+        const value = this.view.getUint16(this.pointer, false);
+        this.pointer += 2;
+        return value;
+    }
+
+    get_float() {
+        const value = this.view.getFloat32(this.pointer, false)
+        this.pointer += 4;
+        return value
+    }
+
+    get_double() {
+        const value = this.view.getFloat64(this.pointer, false)
+        this.pointer += 8;
+        return value
     }
 
     get_long() {
@@ -212,6 +258,10 @@ class MineDataView {
         const value = this.view.getInt8(this.pointer, false)
         this.pointer += 1
         return value
+    }
+
+    get_boolean() {
+        return this.get_byte() !== 0;
     }
 
     get_ubyte() {
@@ -240,9 +290,180 @@ class MineDataView {
         if (!window.nbt) {
             throw new Error("nbt.js has not been imported (yet).")
         }
-        const nbt = nbt.parse(this.get_rest())
+        const nbt = window.nbt.parse(this.get_rest())
         this.pointer += nbt.finalPosition
         delete nbt.finalPosition
         return nbt
+    }
+
+    get_command_node() {
+        const node = {}
+
+        const flags = this.get_byte()
+
+        node.type = (["root", "literal", "argument"])[flags & 0x03]
+        node.isExecutable = (flags & 0x04) !== 0;
+        const hasRedirect = (flags & 0x08) !== 0;
+        const hasSuggestionType = (flags & 0x10) !== 0;
+
+        const childrenCount = this.get_varint();
+        node.childrenIds = []
+        for (let i = 0; i < childrenCount; i++) {
+            node.childrenIds.push(this.get_varint())
+        }
+
+        if (hasRedirect) {
+            node.redirectNode = this.get_varint();
+        }
+        if (node.type != "root") {
+            node.name = this.get_string();
+        }
+        if (node.type == "argument") {
+            var parserId = this.get_varint();
+            node.parserId = parserId;
+            switch(parserId) {
+                case(1): { // brigadier:float
+                    const flags = this.get_byte()
+                    const hasMin = flags & 0x01
+                    const hasMax = flags & 0x02
+                    if (hasMin) {
+                        node.min = this.get_float();
+                    }
+                    if (hasMax) {
+                        node.max = this.get_float();
+                    }
+                    break;
+                }
+                case(2): { // brigadier:double
+                    const flags = this.get_byte()
+                    const hasMin = flags & 0x01
+                    const hasMax = flags & 0x02
+                    if (hasMin) {
+                        node.min = this.get_double();
+                    }
+                    if (hasMax) {
+                        node.max = this.get_double();
+                    }
+                    break;
+                }
+                case(3): { // brigadier:integer
+                    const flags = this.get_byte()
+                    const hasMin = flags & 0x01
+                    const hasMax = flags & 0x02
+                    if (hasMin) {
+                        node.min = this.get_int();
+                    }
+                    if (hasMax) {
+                        node.max = this.get_int();
+                    }
+                    break;
+                }
+                case(4): { // brigadier:long
+                    const flags = this.get_byte()
+                    const hasMin = flags & 0x01
+                    const hasMax = flags & 0x02
+                    if (hasMin) {
+                        node.min = this.get_long();
+                    }
+                    if (hasMax) {
+                        node.max = this.get_long();
+                    }
+                    break;
+                }
+                case(5): { // brigadier:string
+                    const behavior = this.get_varint();
+                    node.behavior = behavior
+                    break;
+                }
+                case(6): { // minecraft:entity
+                    const flags = this.get_byte()
+                    const onlyOneEntity = (flags & 0x01) !== 0
+                    const onlyPlayers = (flags & 0x02) !== 0
+
+                    node.behavior = {
+                        onlyOneEntity,
+                        onlyPlayers
+                    }
+                    break;
+                }
+                case(30): { // minecraft:score_holder
+                    const flags = this.get_byte()
+                    const multipleEntities = (flags & 0x01) !== 0
+
+                    node.behavior = {
+                        onlyOneEntity: !multipleEntities
+                    }
+                    break;
+                }
+                case(41): { // minecraft:time
+                    node.min = this.get_int()
+                    break;
+                }
+                case(42): { // minecraft:resource_or_tag
+                    node.suggestionSource = this.get_string()
+                    break;
+                }
+                case(43): { // minecraft:resource_or_tag_key
+                    node.suggestionSource = this.get_string()
+                    break;
+                }
+                case(44): { // minecraft:resource
+                    node.suggestionSource = this.get_string()
+                    break;
+                }
+                case(45): { // minecraft:resource_key
+                    node.suggestionSource = this.get_string()
+                    break;
+                }
+                default: {
+
+                }
+            }
+        }
+        if (hasSuggestionType) {
+            node.suggestionType = this.get_string()
+        }
+        return node
+    }
+
+    get_slot_data() { // TODO:
+        var itemData = {}
+
+        const itemCount = this.get_varint();
+        var itemId, componentsToAdd = {}, componentsToRemove = [];
+        if (itemCount > 0) {
+            itemData.itemId = this.get_varint();
+            const toAddCount = this.get_varint();
+            const toRemoveCount = this.get_varint();
+            for (let i = 0; i < toAddCount; i++) {
+                const componentType = Object.keys(COMPONENT_TYPE)[this.get_varint()]
+                switch (componentType) {
+                    case(0): { // minecraft:custom_data
+                        itemData.data = this.get_nbt()
+                        break;
+                    }
+                    case(1): { // minecraft:max_stack_size
+                        itemData.maxStackSize = this.get_varint()
+                    }
+                    case(2): { // minecraft:max_damage
+                        itemData.maxDurability = this.get_varint()
+                    }
+                    case(3): { // minecraft:damage
+                        itemData.durabilityUsed = this.get_varint()
+                    }
+                }
+            }
+        }
+    }
+
+    get_text_component() {
+        const type = this.get_byte()
+        if (type == 8) { // string
+            const length = this.get_ushort()
+            return convertBinaryToText(this.get_bytes(length))
+        } else { // compound
+            this.pointer -= 1
+            return this.get_nbt()
+        }
     }
 }

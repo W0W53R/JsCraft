@@ -36,6 +36,9 @@ class MinecraftConnection {
     switchState(state) {
         this._state = state
     }
+    close() {
+        this._stream.close()
+    }
     sendPacket(packet) {
         if (!Packet.prototype.isPrototypeOf(packet)) {
             throw new TypeError("MinecraftConnection.send(packet): packet does not extend Packet")

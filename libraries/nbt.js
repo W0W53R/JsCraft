@@ -591,7 +591,7 @@
 	 * // -> { name: 'My Level',
 	 * //      value: { foo: { type: int, value: 42 },
 	 * //               bar: { type: string, value: 'Hi!' }}} */
-	nbt.parseUncompressed = function(data) {
+	nbt.parseUncompressed = function(data, isNetwork = true) {
 		if (!data) { throw new Error('Argument "data" is falsy'); }
 
 		var reader = new nbt.Reader(data);
@@ -602,7 +602,7 @@
 		}
 
 		return {
-			name: reader.string(),
+			name: isNetwork ? undefined : reader.string(),
 			value: reader.compound(),
 			finalPosition: reader.offset
 		};
@@ -645,10 +645,9 @@
 		var self = this;
 
 		if (!hasGzipHeader(data)) {
-			callback(null, self.parseUncompressed(data));
+			return self.parseUncompressed(data);
 		} else if (!zlib) {
-			callback(new Error('NBT archive is compressed but zlib is not ' +
-				'available'), null);
+			return new Error('NBT archive is compressed but zlib is not available');
 		} else {
 			/* zlib.gunzip take a Buffer, at least in Node, so try to convert
 			   if possible. */
@@ -665,9 +664,9 @@
 
 			zlib.gunzip(buffer, function(error, uncompressed) {
 				if (error) {
-					callback(error, null);
+					return error;
 				} else {
-					callback(null, self.parseUncompressed(uncompressed));
+					return self.parseUncompressed(uncompressed);
 				}
 			});
 		}
