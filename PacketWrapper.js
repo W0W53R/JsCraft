@@ -10,6 +10,7 @@ class PacketWrapper { // Only for Clientbound packets
         }
     }
     wrapPacket(packet) {
+        console.log("Packet", packet)
         const reader = new MineDataView(packet);
         const id = reader.get_varint(); // Read the packet ID
         switch (this.state) {
@@ -241,6 +242,26 @@ class PacketWrapper { // Only for Clientbound packets
                     }                
             case MinecraftConnection.STATE.PLAY:
                 switch (id) {
+                    case(0x00): {
+                        return new BundleDelimiterPlayPacket()
+                    }
+                    case(0x01): {
+                        return new SpawnEntityPlayPacket(
+                            reader.get_varint(),
+                            reader.get_bytes(16),
+                            reader.get_varint(),
+                            reader.get_double(),
+                            reader.get_double(),
+                            reader.get_double(),
+                            reader.get_byte(),
+                            reader.get_byte(),
+                            reader.get_byte(),
+                            reader.get_varint(),
+                            reader.get_short(),
+                            reader.get_short(),
+                            reader.get_short(),
+                        )
+                    }
                     case(0x2c): {
                         var hasDeathLocation;
                         return new LoginPlayPacket(
@@ -401,6 +422,60 @@ class PacketWrapper { // Only for Clientbound packets
                             playerList.push(playerData)
                         }
                         return new PlayerInfoUpdatePlayPacket(playerList)
+                    }
+                    case(0x26): {
+                        return new InitalizeWorldBorderPlayPacket(
+                            reader.get_double(),
+                            reader.get_double(),
+                            reader.get_double(),
+                            reader.get_double(),
+                            reader.get_varlong(),
+                            reader.get_varint(),
+                            reader.get_varint(),
+                            reader.get_varint()
+                        )
+                    }
+                    case(0x6b): {
+                        return new UpdateTimePlayPacket(
+                            reader.get_long(),
+                            reader.get_long(),
+                            reader.get_boolean()
+                        )
+                    }
+                    case(0x5b): {
+                        const position = reader.get_position()
+                        const angle = reader.get_float()
+                        return new SetDefaultSpawnPositionPlayPacket(
+                            position.x,
+                            position.y,
+                            position.z,
+                            angle
+                        )
+                    }
+                    case(0x23): {
+                        const event = reader.get_ubyte()
+                        const value = reader.get_float()
+                        return new GameEventPlayPacket(
+                            event,
+                            value
+                        )
+                    }
+                    case(0x78): {
+                        return new SetTickingStatePlayPacket(
+                            reader.get_float(),
+                            reader.get_boolean()
+                        )
+                    }
+                    case(0x79): {
+                        return new StepTickPlayPacket(
+                            reader.get_varint()
+                        )
+                    }
+                    case(0x58): {
+                        return new SetCenterChunkPlayPacket(
+                            reader.get_varint(),
+                            reader.get_varint()
+                        )
                     }
                     default: {
                         console.log("Unknown Packet (" + id + ")", reader.get_rest())

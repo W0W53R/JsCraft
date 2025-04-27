@@ -14,35 +14,47 @@ class MinecraftInstance {
             this.wispConnection.addEventListener("error", reject);
         });
 
-        const verifier = new MinecraftVerifier();
-        if (!await verifier.getVerified()) {
+        this.verifier = new MinecraftVerifier();
+        if (!await this.verifier.getVerified()) {
             return;
         }
-        this.accountDetails = await verifier.getAccountDetails();
+        this.accountDetails = await this.verifier.getAccountDetails();
 
         this.connection = new MinecraftConnection(this.wispConnection, this.settings.host, this.settings.port);
-        this.wrapper = new PacketWrapper();
+        this.wrapper = new AutoPacketWrapper();
 
-        this.$runMainLoop()
+        this.#runMainLoop()
     }
-    async $runMainLoop() {
+    async transfer(host, port) {
+        this.connection.transfer(host, port)
+
+        this.#runMainLoop()
+    }
+    async #runMainLoop() {
         while (true) {
-            packet = this.wrapper.wrapPacket(await this.connection.getPacket())
+            const packet = await this.connection.getPacket()
+            console.log("Received packet: ", packet)
+            var testPacket = await this.wrapper.readPacket(packet)
+
+            console.log("Received packet: ", testPacket);
 
             var handled = false;
             for (const [packet, handlers] of Object.entries(this.handlers)) {
-                if (packet.prototype.isPrototypeOf(packet)) {
+                if (testPacket.name == packet) {
                     handled = true;
                     for (const handler of handlers) {
-                        handler(packet)
+                        handler(testPacket)
                     }
                 }
             }
             if (!handled) {
-                console.warn("Packet: ", packet, " not handled!")
+                console.warn("Packet: ", testPacket, " not handled!")
             }
 
         }
+    }
+    sendPacket(packet) {
+        this.connection.sendPacket(packet)
     }
     switchState(state) {
         this.connection.switchState(state)
@@ -54,5 +66,8 @@ class MinecraftInstance {
     }
     removeHandler(packet, handler) {
         this.handlers[packet] = this.handlers[packet].filter((handlerToCheck) => handlerToCheck != handler)
+    }
+    joinServer(hash) {
+        return this.verifier.joinServer(this.accountDetails.id, hash)
     }
 }

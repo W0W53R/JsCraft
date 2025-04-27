@@ -38,6 +38,36 @@ class MinecraftConnection {
     }
     close() {
         this._stream.close()
+        this._packetPromises.forEach(p => p.reject("Connection closed"));
+    }
+    transfer(host, port) {
+        this.close()
+
+        this._stream = this._connection.create_stream(host, port, "tcp")
+
+        this._stream.addEventListener("message", function(event) {
+            _this._onMessage(event.data);
+        })
+        const _this = this;
+        this._stream.addEventListener("close", function(event) {
+            console.error("Stream closed:", event);
+            _this._packetPromises.forEach(p => p.reject(event));
+            _this._packetPromises = [];
+            _this._recievedPackets = [];
+        })
+
+        this.encryptedSend = false;
+        this.encryptedRecieve = false;
+        this._encryptorFromServer = undefined;
+        this._encryptorToServer = undefined;
+        this.compression_limit = -1;
+        this.compression_set = false;
+
+        this._state = MinecraftConnection.STATE.HANDSHAKE
+        this._packetBufferFromServer = new ArrayBuffer();
+        this._packetBufferToServer = new ArrayBuffer();
+        this._recievedPackets = [];
+        this._packetPromises = [];
     }
     sendPacket(packet) {
         if (!Packet.prototype.isPrototypeOf(packet)) {
@@ -91,6 +121,7 @@ class MinecraftConnection {
         }
         this.compression_limit = limit;
         this.compression_set = true;
+        console.log("Compression limit set to: ", limit);
     }
     _onMessage(data) {
         data = data.buffer;
@@ -112,27 +143,29 @@ class MinecraftConnection {
                 break; // Not enough data for a full packet
             }
             var packetData = this._packetBufferFromServer.slice(0, packetSize + packetStart);
-            if (this.compression_set) {
-                const uncompressedSize = reader.get_varint(); // size of uncompressed data; 0 if not compressed
-                if (uncompressedSize != 0) {
-                    const compressedData = new Uint8Array(packetData.slice(reader.pointer)); // Skip the packet size byte
-                    try {
-                        const decompressedData = pako.inflate(compressedData);
-                        packetData = decompressedData;
-                    } catch (e) {
-                        console.error("Failed to decompress packet:", e);
-                        break; // Exit if decompression fails
-                     }
-                } else {
-                    packetData = new Uint8Array(packetData.slice(reader.pointer)); // Skip the packet size byte
-                }
-            } else {
-                packetData = new Uint8Array(packetData.slice(reader.pointer)); // Skip the packet size byte
-            }
+            // console.log("Checking packet compression")
+            // if (this.compression_set) {
+            //     const uncompressedSize = reader.get_varint(); // size of uncompressed data; 0 if not compressed
+            //     if (uncompressedSize != 0) {
+            //         const compressedData = new Uint8Array(packetData.slice(reader.pointer)); // Skip the packet size byte
+            //         try {
+            //             const decompressedData = pako.inflate(compressedData);
+            //             packetData = decompressedData;
+            //         } catch (e) {
+            //             console.error("Failed to decompress packet:", e);
+            //             break; // Exit if decompression fails
+            //          }
+            //     } else {
+            //         packetData = new Uint8Array(packetData.slice(reader.pointer)); // Skip the packet size byte
+            //     }
+            // } else {
+            //     
+            // }
+            packetData = new Uint8Array(packetData.slice(reader.pointer)); // Skip the packet size byte
             this._packetBufferFromServer = this._packetBufferFromServer.slice(packetSize + packetStart);
             if (this._packetPromises.length > 0) {
                 const packetPromise = this._packetPromises.shift();
-                packetPromise.resolve(packetData);
+                packetPromise.resolve(this.#decompressPacketIfNeeded(packetData));
             } else {
                 this._recievedPackets.push(packetData);
             }
@@ -141,11 +174,33 @@ class MinecraftConnection {
 
     async getPacket() {
         if (this._recievedPackets.length > 0) {
-            return this._recievedPackets.shift();
+            return this.#decompressPacketIfNeeded(this._recievedPackets.shift());
         } else {
             return new Promise((resolve, reject) => {
                 this._packetPromises.push({ resolve, reject });
             });
+        }
+    }
+
+    #decompressPacketIfNeeded(packetBuffer) {
+        const reader = new MineDataView(packetBuffer);
+        if (this.compression_set) {
+            const uncompressedSize = reader.get_varint(); // size of uncompressed data; 0 if not compressed
+            if (uncompressedSize != 0) {
+                const compressedData = reader.get_rest();
+                try {
+                    const decompressedData = pako.inflate(compressedData);
+                    return decompressedData;
+                } catch (e) {
+                    console.error("Failed to decompress packet:", e);
+                    debugger
+                    return null; // Exit if decompression fails
+                }
+            } else {
+                return reader.get_rest();
+            }
+        } else {
+            return reader.get_rest();
         }
     }
 }

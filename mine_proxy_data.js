@@ -97,6 +97,25 @@ function to_varint(number) {
     return buffer;
 }
 
+function to_varlong(value) {
+    // Ensure input is a BigInt.
+    if (typeof value !== 'bigint') {
+      throw new TypeError('The value must be a BigInt.');
+    }
+  
+    const bytes = [];
+  
+    do {
+      let byteVal = Number(value & 0x7Fn);
+      value >>= 7n;
+      if (value !== 0n) {
+        byteVal |= 0x80;
+      }
+      bytes.push(byteVal);
+    } while (value !== 0n);
+    return new Uint8Array(bytes).buffer;
+  }
+
 function to_string(string) {
     if (!(typeof string === "string")) {
         throw new TypeError("to_string(string): string is not of type String")
@@ -116,7 +135,7 @@ function to_boolean(boolean) {
     return new Uint8Array(boolean ? 1 : 0)
 }
 function to_position(x, y, z) {
-    const blob = ((new BigInt(x) & 0x3FFFFFFn) << 38n) | ((new BigInt(z) & 0x3FFFFFFn) << 12n) | (new BigInt(y) & 0xFFFn)
+    const blob = ((BigInt(x) & 0x3FFFFFFn) << 38n) | ((BigInt(z) & 0x3FFFFFFn) << 12n) | (BigInt(y) & 0xFFFn)
     const buffer = new ArrayBuffer(8)
     const view = new BigUint64Array(buffer)
     view[0] = blob
@@ -200,9 +219,32 @@ class MineDataView {
         return value;
     }
     
+    get_varlong() {
+        let value = 0n;
+        let position = 0;
+        let currentByte;
+
+        do {
+            if (position >= 70) { // 70 bits is a reasonable cutoff for VarLong
+                throw new Error("VarLong is too big");
+            }
+            currentByte = this.buffer[this.pointer++];
+            value |= BigInt(currentByte & 0x7F) << BigInt(position);
+            position += 7;
+        } while (currentByte & 0x80);
+
+        return value;
+    }
 
     get_string() {
         const length = this.get_varint();
+        return this.get_pstring(length);
+    }
+
+    get_pstring(length) {
+        if (length < 0) {
+            throw new Error("Length must be a non-negative integer.");
+        }
         const stringBytes = this.buffer.slice(this.pointer, this.pointer + length);
         this.pointer += length;
         return convertBinaryToText(stringBytes);
@@ -250,6 +292,12 @@ class MineDataView {
         return value;
     }
 
+    get_ulong() {
+        const value = this.view.getBigUint64(this.pointer, false);
+        this.pointer += 8;
+        return value;
+    }
+
     get_rest() {
         return new Uint8Array(this.buffer.slice(this.pointer))
     }
@@ -286,6 +334,15 @@ class MineDataView {
         return array;
     }
 
+    get_varint_array() {
+        const length = this.get_varint();
+        const array = new Array(length);
+        for (let i = 0; i < length; i++) {
+            array[i] = this.get_varint();
+        }
+        return array;
+    }
+
     get_nbt() {
         if (!window.nbt) {
             throw new Error("nbt.js has not been imported (yet).")
@@ -294,6 +351,15 @@ class MineDataView {
         this.pointer += nbt.finalPosition
         delete nbt.finalPosition
         return nbt
+    }
+
+    get_position() {
+        const val = this.get_long();
+        return {
+            x: Number(val >> 38n) & 0x3FFFFFF,
+            y: Number(val & 0xFFFn),
+            z: Number(val << 26n >> 38n) & 0x3FFFFFF
+        }
     }
 
     get_command_node() {
@@ -424,36 +490,6 @@ class MineDataView {
             node.suggestionType = this.get_string()
         }
         return node
-    }
-
-    get_slot_data() { // TODO:
-        var itemData = {}
-
-        const itemCount = this.get_varint();
-        var itemId, componentsToAdd = {}, componentsToRemove = [];
-        if (itemCount > 0) {
-            itemData.itemId = this.get_varint();
-            const toAddCount = this.get_varint();
-            const toRemoveCount = this.get_varint();
-            for (let i = 0; i < toAddCount; i++) {
-                const componentType = Object.keys(COMPONENT_TYPE)[this.get_varint()]
-                switch (componentType) {
-                    case(0): { // minecraft:custom_data
-                        itemData.data = this.get_nbt()
-                        break;
-                    }
-                    case(1): { // minecraft:max_stack_size
-                        itemData.maxStackSize = this.get_varint()
-                    }
-                    case(2): { // minecraft:max_damage
-                        itemData.maxDurability = this.get_varint()
-                    }
-                    case(3): { // minecraft:damage
-                        itemData.durabilityUsed = this.get_varint()
-                    }
-                }
-            }
-        }
     }
 
     get_text_component() {

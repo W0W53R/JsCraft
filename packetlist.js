@@ -397,6 +397,12 @@ class ServerboundKnownPacksConfigurationPacket extends Packet {
         this.packs = packs; // Store the packs array for later use
     }
 }
+class KeepAliveConfigurationPacket extends Packet {
+    constructor(magicNumber) {
+        super(0x08, to_long(magicNumber));
+        this.magicNumber = magicNumber;
+    }
+}
 // STATE: Play
 class LoginPlayPacket extends Packet {
     constructor(entityId, isHardcore, dimensionNames, maxPlayers, viewDistance, simulationDistance, reducedDebugInfo, 
@@ -593,5 +599,118 @@ class PlayerInfoUpdatePlayPacket extends Packet {
     constructor(players) {
         super(0x40)
         this.players = players
+    }
+}
+class InitalizeWorldBorderPlayPacket extends Packet {
+    constructor(x, z, oldDiamater, newDiamater, speed, portalTeleportBoundary, warningBlocks, warningTime) {
+        super(0x26,
+            to_double(x),
+            to_double(z),
+            to_double(oldDiamater),
+            to_double(newDiamater),
+            to_varlong(speed),
+            to_varint(portalTeleportBoundary),
+            to_varint(warningBlocks),
+            to_varint(warningTime)
+        )
+        this.x = x
+        this.z = z
+        this.oldDiamater = oldDiamater
+        this.newDiamater = newDiamater
+        this.speed = speed
+        this.portalTeleportBoundary = portalTeleportBoundary
+        this.warningBlocks = warningBlocks
+        this.warningTime = warningTime
+    }
+}
+class UpdateTimePlayPacket extends Packet {
+    constructor(worldAge, timeOfDay, timeOfDayIncreasing) {
+        super(0x6b,
+            to_long(worldAge),
+            to_long(timeOfDay),
+            to_boolean(timeOfDayIncreasing)
+        )
+        this.worldAge = worldAge
+        this.timeOfDay = timeOfDay
+        this.timeOfDayIncreasing = timeOfDayIncreasing
+    }
+}
+class SetDefaultSpawnPositionPlayPacket extends Packet {
+    constructor(x, y, z, angle) {
+        super(0x5b,
+            to_position(x, y, z),
+            to_float(angle)
+        )
+        this.x = x
+        this.y = y
+        this.z = z
+        this.angle = angle
+    }
+}
+class GameEventPlayPacket extends Packet {
+    constructor(event, value) {
+        super(0x23,
+            to_ubyte(event),
+            to_float(value)
+        )
+        this.event = event
+        this.value = value
+    }
+}
+class SetTickingStatePlayPacket extends Packet {
+    constructor(tickRate, frozen) {
+        super(0x78,
+            to_float(tickRate),
+            to_boolean(frozen)
+        )
+        this.tickRate = tickRate
+        this.frozen = frozen
+    }
+}
+class StepTickPlayPacket extends Packet {
+    constructor(ticks) {
+        super(0x79,
+            to_varint(ticks)
+        )
+        this.ticks = ticks
+    }
+}
+class SetCenterChunkPlayPacket extends Packet {
+    constructor(chunkX, chunkZ) {
+        super(0x58,
+            to_varint(chunkX),
+            to_varint(chunkZ)
+        )
+        this.chunkX = chunkX
+        this.chunkZ = chunkZ
+    }
+}
+class BundleDelimiterPlayPacket extends Packet {
+    constructor() {
+        super(0x00)
+    }
+}
+class SpawnEntityPlayPacket extends Packet {
+    constructor(id, uuid, type, x, y, z, pitch, yaw, headYaw, data, vx, vy, vz) {
+        super(0x01)
+        this.id = id;
+        this.uuid = uuid;
+        this.type = type;
+        this.x = x
+        this.y = y
+        this.z = z
+        this.pitch = pitch
+        this.yaw = yaw
+        this.headYaw = headYaw
+        this.data = data
+        this.vx = vx
+        this.vy = vy
+        this.vz = vz
+    }
+}
+class KeepAlivePlayPacket extends Packet {
+    constructor(id) {
+        super(0x1A, to_varint(id))
+        this.id = id
     }
 }
