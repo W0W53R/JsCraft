@@ -7,9 +7,10 @@ class BlockRegistry {
     static getByState(state) {
         for (let block of BlockRegistry.BlockData) {
             if (block.minStateId <= state && state <= block.maxStateId) {
-                block.state = block.minStateId - state;
+                block.state = state - block.minStateId;
                 return block;
             }
         }
+        throw new Error("Invalid State: " + state);
     }
 }

@@ -74,7 +74,7 @@ class MinecraftConnection {
             throw new TypeError("MinecraftConnection.send(packet): packet does not extend Packet")
         }
 
-        console.log("Sending Packet: ", packet)
+        Logger.log("info", "Sending Packet: ", packet)
 
         var packet = packet.buildWithoutLength();
         if (this.compression_limit > 0) {
@@ -121,7 +121,7 @@ class MinecraftConnection {
         }
         this.compression_limit = limit;
         this.compression_set = true;
-        console.log("Compression limit set to: ", limit);
+        Logger.log("info", "Compression limit set to: ", limit);
     }
     _onMessage(data) {
         data = data.buffer;
@@ -143,7 +143,7 @@ class MinecraftConnection {
                 break; // Not enough data for a full packet
             }
             var packetData = this._packetBufferFromServer.slice(0, packetSize + packetStart);
-            // console.log("Checking packet compression")
+            // Logger.log("info", "Checking packet compression")
             // if (this.compression_set) {
             //     const uncompressedSize = reader.get_varint(); // size of uncompressed data; 0 if not compressed
             //     if (uncompressedSize != 0) {

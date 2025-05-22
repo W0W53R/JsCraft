@@ -89,7 +89,7 @@ async function fetchServerStatus(host, port, card) {
         await connection.getPacket();
         const ping = Date.now() - start;
 
-        console.log("Server details for", host, data, "Ping:", ping);
+        Logger.log("info", "Server details for", host, data, "Ping:", ping);
 
         card.innerHTML = `
             ${data.favicon ? `<img class="favicon" src="${data.favicon}" alt="Favicon">` : ''}

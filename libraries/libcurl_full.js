@@ -418,7 +418,7 @@ class WispWebSocket extends EventTarget {
   }
 }function logger(type, text) {
   if (type === "log")
-    console.log(text);
+    Logger.log("info", text);
   else if (type === "warn") 
     console.warn(text);
   else if (type === "error")

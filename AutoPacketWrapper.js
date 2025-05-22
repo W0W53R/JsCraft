@@ -23,7 +23,7 @@ class AutoPacketWrapper {
         }
         const typeData = typelist[type]
 
-        // console.log("Reading type: ", type, "Applied Data: ", appliedData, "Type Data: ", typeData)
+        // Logger.log("info", "Reading type: ", type, "Applied Data: ", appliedData, "Type Data: ", typeData)
 
         if (typeData == "native") {
             switch(type) {
@@ -181,7 +181,7 @@ class AutoPacketWrapper {
                         variables[appliedData[i].name] = value
                         localVariables[appliedData[i].name] = value
                     }
-                    // console.log("Bitfield local variables: ", localVariables)
+                    // Logger.log("info", "Bitfield local variables: ", localVariables)
                     return localVariables
                 }
                 case("void"): {

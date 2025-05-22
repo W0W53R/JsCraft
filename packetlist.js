@@ -146,7 +146,10 @@ class LoginAcknowledgeLoginPacket extends Packet {
 }
 class CookieResponseLoginPacket extends Packet {
     constructor(key, value) {
-        super(0x04, to_string(key), to_bytearray(value || ""))
+        super(0x04,
+            to_string(key),
+            to_boolean(value),
+            value ? to_bytearray(value) : new ArrayBuffer(0))
         this.key = key;
         this.value = value || ""; // Default to empty string if no value is provided
     }

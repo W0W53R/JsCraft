@@ -636,8 +636,8 @@
 	 *     if (error) {
 	 *         throw error;
 	 *     }
-	 *     console.log(result.name);
-	 *     console.log(result.value.foo);
+	 *     Logger.log("info", result.name);
+	 *     Logger.log("info", result.value.foo);
 	 * }); */
 	nbt.parse = function(data, callback) {
 		if (!data) { throw new Error('Argument "data" is falsy'); }

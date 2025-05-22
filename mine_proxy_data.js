@@ -129,10 +129,10 @@ function to_bytearray(bytes) {
 }
 
 function to_boolean(boolean) {
-    if (!(typeof boolean === "boolean")) {
-        throw new TypeError("to_boolean(boolean): boolean is not of type Boolean")
-    }
-    return new Uint8Array(boolean ? 1 : 0)
+    // if (!(typeof boolean === "boolean")) {
+    //     throw new TypeError("to_boolean(boolean): boolean is not of type Boolean")
+    // }
+    return (new Uint8Array([boolean ? 1 : 0])).buffer
 }
 function to_position(x, y, z) {
     const blob = ((BigInt(x) & 0x3FFFFFFn) << 38n) | ((BigInt(z) & 0x3FFFFFFn) << 12n) | (BigInt(y) & 0xFFFn)

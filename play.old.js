@@ -25,7 +25,7 @@ async function main() {
 
     const accountDetails = await verifier.getAccountDetails();
 
-    console.log("Account details:", accountDetails);
+    Logger.log("info", "Account details:", accountDetails);
 
     const connection = new MinecraftConnection(wispConnection, host, port);
     const wrapper = new PacketWrapper();
@@ -39,7 +39,7 @@ async function main() {
 
     var packet = wrapper.wrapPacket(await connection.getPacket());
     while (!(packet instanceof LoginSuccessLoginPacket)) {
-        console.log("Received packet: ", packet);
+        Logger.log("info", "Received packet: ", packet);
         if (packet instanceof EncryptionRequestLoginPacket) {
             const pemKey = "-----BEGIN PUBLIC KEY-----\n" +
                 buffer_to_base64(packet.publicKey).replace(/(.{64})/g, "$&\n") + // Add newlines every 64 characters
@@ -55,7 +55,7 @@ async function main() {
                 packet.publicKey, // The public key from the server
             );
 
-            console.log("Server Hash: ", serverHash);
+            Logger.log("info", "Server Hash: ", serverHash);
 
             if (packet.shouldAuthenticate) {
                 await verifier.joinServer(accountDetails.id, serverHash);
@@ -66,9 +66,9 @@ async function main() {
 
             // encoder.encode(atob( ... ))
             const encryptedSharedSecret = convertTextToBinary(publickey.encrypt(convertBinaryToText(sharedSecret)));
-            console.log("Verify Token: ", packet.verifyToken.buffer);
+            Logger.log("info", "Verify Token: ", packet.verifyToken.buffer);
             const encryptedVerifyToken = convertTextToBinary(publickey.encrypt(convertBinaryToText(packet.verifyToken.buffer)));
-            console.log("Encrypted Verify Token: ", encryptedVerifyToken.buffer);
+            Logger.log("info", "Encrypted Verify Token: ", encryptedVerifyToken.buffer);
 
             if (encryptedSharedSecret.length !== 128 || encryptedVerifyToken.length !== 128) {
                 console.error("Encryption failed: Encrypted data is not 128 bytes long.");
@@ -91,7 +91,7 @@ async function main() {
         packet = wrapper.wrapPacket(await connection.getPacket());
     }
     // packet is now LoginSuccessLoginPacket
-    console.log("Login successful:", packet);
+    Logger.log("info", "Login successful:", packet);
     loadingTitle.textContent = "Loading world...";
 
     connection.sendPacket(
@@ -128,21 +128,21 @@ async function main() {
 
     var packet = wrapper.wrapPacket(await connection.getPacket())
     while (!(packet instanceof FinishConfigurationPacket)) {
-        console.log("Recieved Packet: ", packet)
+        Logger.log("info", "Recieved Packet: ", packet)
         if (packet instanceof ConfigurationPluginMessageConfigurationPacket) {
             const channel = packet.channel
             const data = packet.data
 
-            console.log(`${channel}:`, data)
+            Logger.log("info", `${channel}:`, data)
         }
         if (packet instanceof FeatureFlagsConfigurationPacket) {
             const flags = packet.flags
             
-            console.log("Flags: ", flags)
+            Logger.log("info", "Flags: ", flags)
         }
         if (packet instanceof ClientboundKnownPacksConfigurationPacket) {
             const packs = packet.packs
-            console.log("Server is asking if we know about these packs: ", packs)
+            Logger.log("info", "Server is asking if we know about these packs: ", packs)
             
             connection.sendPacket(new ServerboundKnownPacksConfigurationPacket([]))
         }
@@ -151,12 +151,12 @@ async function main() {
             const values = packet.registries
 
             registry[key] = values
-            console.log("Set registry", key, "to", values)
+            Logger.log("info", "Set registry", key, "to", values)
         }
         if (packet instanceof UpdateTagsConfigurationPacket) {
             const tags = packet.tags
 
-            console.log("Tags:", tags)
+            Logger.log("info", "Tags:", tags)
         }
 
         packet = wrapper.wrapPacket(await connection.getPacket())
@@ -170,7 +170,7 @@ async function main() {
     if (!loginPlayPacket instanceof LoginPlayPacket) {
         throw new Error("Expected to get the login play packet, but instead got: ", loginPlayPacket)
     }
-    console.log("Login Play Packet:", loginPlayPacket)
+    Logger.log("info", "Login Play Packet:", loginPlayPacket)
     playerData.id = loginPlayPacket.entityId
     entities[playerData.id] = {
         name: "Player"
@@ -178,43 +178,43 @@ async function main() {
 
     var packet = wrapper.wrapPacket(await connection.getPacket())
     while (true) {
-        console.log("Recieved Packet: ", packet)
+        Logger.log("info", "Recieved Packet: ", packet)
         if (packet instanceof SynchronizePlayerPositionPlayPacket) {
             connection.sendPacket(new ConfirmTeleportationPlayPacket(packet.teleportId))
         }
         if (packet instanceof PlayerAbilitesPlayPacket) {
-            console.log("Abilites: ", packet)
+            Logger.log("info", "Abilites: ", packet)
         }
         if (packet instanceof ClientboundSetHeldItemPlayPacket) {
-            console.log("Selected slot: ", packet.slot)
+            Logger.log("info", "Selected slot: ", packet.slot)
         }
         if (packet instanceof EntityEventPlayPacket) {
-            console.log("Set entity data of", entities[packet.entityId].name, "to", packet.entityStatus)
+            Logger.log("info", "Set entity data of", entities[packet.entityId].name, "to", packet.entityStatus)
             entities[packet.entityId].status = packet.entityStatus
         }
         if (packet instanceof CommandsPlayPacket) {
-            console.log("Added command tree: ", packet)
+            Logger.log("info", "Added command tree: ", packet)
         }
         if (packet instanceof RecipeBookSettingsPlayPacket) {
-            console.log("Added recipe flags: ", packet)
+            Logger.log("info", "Added recipe flags: ", packet)
         }
         if (packet instanceof RecipeBookAddPlayPacket) {
-            console.log("Added Recipes", packet)
+            Logger.log("info", "Added Recipes", packet)
         }
         if (packet instanceof ServerDataPlayPacket) {
-            console.log("Added server data: ", packet)
+            Logger.log("info", "Added server data: ", packet)
         }
         if (packet instanceof PlayerInfoUpdatePlayPacket) {
-            console.log("Updated player list: ", packet)
+            Logger.log("info", "Updated player list: ", packet)
         }
         if (packet instanceof InitalizeWorldBorderPlayPacket) {
-            console.log("Set world border: ", packet)
+            Logger.log("info", "Set world border: ", packet)
         }
         if (packet instanceof UpdateTimePlayPacket) {
-            console.log("Time: ", packet)
+            Logger.log("info", "Time: ", packet)
         }
         if (packet instanceof SetDefaultSpawnPositionPlayPacket) {
-            console.log("Default Spawn Location: ", packet)
+            Logger.log("info", "Default Spawn Location: ", packet)
         }
         if (packet instanceof GameEventPlayPacket) {
             const event = ([
@@ -233,7 +233,7 @@ async function main() {
                 "Limited Crafting",
                 "Wait for Level Chunks"
             ])[packet.event]
-            console.log(event, ": ", packet.value)
+            Logger.log("info", event, ": ", packet.value)
         }
 
         packet = wrapper.wrapPacket(await connection.getPacket())

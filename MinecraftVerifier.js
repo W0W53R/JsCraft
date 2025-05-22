@@ -52,31 +52,31 @@ class MinecraftVerifier {
         if (accountDetails) {
             return true; // Successfully verified with Minecraft token
         } else {
-            console.log("Minecraft token expired or invalid. Attempting to use refresh token.");
+            Logger.log("info", "Minecraft token expired or invalid. Attempting to use refresh token.");
             // Use refresh token
             const refreshToken = localStorage.getItem("jscraft.ms_refresh_token");
-            console.log("Refresh Token: ", refreshToken);
+            Logger.log("info", "Refresh Token: ", refreshToken);
             if (!refreshToken) {
-                console.log("No refresh token found. Redirecting to verification page.");
+                Logger.log("info", "No refresh token found. Redirecting to verification page.");
                 if (allowRedirect) {
                     this.showVerificationExpired();
                 }
                 return false;
             }
-            console.log("Using refresh token to get new access token.");
+            Logger.log("info", "Using refresh token to get new access token.");
             const msToken = await this.useRefreshToken(refreshToken);
-            console.log("Refresh Token: ", msToken);
+            Logger.log("info", "Refresh Token: ", msToken);
             if (msToken) {
                 // Get mc access token using the 
                 const mcToken = await this.useAccessToken(msToken);
                 if (!mcToken) {
-                    console.log("Failed to get Minecraft access token. Redirecting to verification page.");
+                    Logger.log("info", "Failed to get Minecraft access token. Redirecting to verification page.");
                     if (allowRedirect) {
                         this.showVerificationExpired();
                     }
                     return false;
                 }
-                console.log("Minecraft access token: ", mcToken);
+                Logger.log("info", "Minecraft access token: ", mcToken);
                 // Reset the Minecraft token in local storage
                 localStorage.setItem("jscraft.mc_token", mcToken);
                 const newAccountDetails = await this.getAccountDetails();
@@ -159,7 +159,7 @@ class MinecraftVerifier {
         }
         const mine_json = await mine_auth.json()
         const mine_token = mine_json.access_token
-        console.log("Minecraft Access Token: ", mine_token)
+        Logger.log("info", "Minecraft Access Token: ", mine_token)
         localStorage.setItem("jscraft.mc_token", mine_token)
         return mine_token
     }
@@ -183,8 +183,8 @@ class MinecraftVerifier {
         const back = await data.json();
         const microsoftAccessToken = back.access_token.toString();
         const microsoftRefreshToken = back.refresh_token;
-        console.log("Access Token: ", microsoftAccessToken);
-        console.log("Refresh Token: ", microsoftRefreshToken);
+        Logger.log("info", "Access Token: ", microsoftAccessToken);
+        Logger.log("info", "Refresh Token: ", microsoftRefreshToken);
         localStorage.setItem("jscraft.ms_refresh_token", microsoftRefreshToken);
         return microsoftAccessToken;
     }
@@ -210,8 +210,8 @@ class MinecraftVerifier {
         const auth_json = await microsoft_auth.json()
         const microsoft_access_token = auth_json.access_token.toString()
         const microsoft_refresh_token = auth_json.refresh_token
-        console.log("Access Token: ", microsoft_access_token)
-        console.log("Refresh Token: ", microsoft_refresh_token)
+        Logger.log("info", "Access Token: ", microsoft_access_token)
+        Logger.log("info", "Refresh Token: ", microsoft_refresh_token)
         localStorage.setItem("jscraft.ms_refresh_token", microsoft_refresh_token)
         
         return true;
@@ -238,7 +238,7 @@ class MinecraftVerifier {
             console.error("Failed to join server:", response.statusText);
             return false;
         }
-        console.log("Successfully joined the server!");
+        Logger.log("info", "Successfully joined the server!");
         return true; // Successfully joined the server
     }
 }

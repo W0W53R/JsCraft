@@ -33,10 +33,9 @@ class MinecraftInstance {
     async #runMainLoop() {
         while (true) {
             const packet = await this.connection.getPacket()
-            console.log("Received packet: ", packet)
             var testPacket = await this.wrapper.readPacket(packet)
 
-            console.log("Received packet: ", testPacket);
+            Logger.log("packet", "Packet: ", packet, testPacket)
 
             var handled = false;
             for (const [packet, handlers] of Object.entries(this.handlers)) {
@@ -48,7 +47,7 @@ class MinecraftInstance {
                 }
             }
             if (!handled) {
-                console.warn("Packet: ", testPacket, " not handled!")
+                Logger.log("packeterr", "Packet: ", testPacket, " not handled!")
             }
 
         }

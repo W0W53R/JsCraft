@@ -10,7 +10,7 @@ class PacketWrapper { // Only for Clientbound packets
         }
     }
     wrapPacket(packet) {
-        console.log("Packet", packet)
+        Logger.log("info", "Packet", packet)
         const reader = new MineDataView(packet);
         const id = reader.get_varint(); // Read the packet ID
         switch (this.state) {
@@ -478,7 +478,7 @@ class PacketWrapper { // Only for Clientbound packets
                         )
                     }
                     default: {
-                        console.log("Unknown Packet (" + id + ")", reader.get_rest())
+                        Logger.log("info", "Unknown Packet (" + id + ")", reader.get_rest())
                         debugger;
                     }
                 }
